@@ -1,0 +1,35 @@
+#!/bin/bash
+
+bindir=$(dirname "$0")  # not perfect, but good enough
+user=$1
+shift
+
+if [[ -z $user ]]; then
+        echo "usage: $0 <username>"
+        exit
+fi
+
+homedir="$bindir/../users/$user"
+
+id $user >/dev/null 2>&1
+if [[ $? != 0 ]]; then
+        echo "${user}: no such user."
+        exit;
+fi
+
+# script to add a new user
+if [[ -d "$homedir" ]]; then
+        echo "User $user already exists ..."
+        exit
+fi
+
+mkdir "$homedir"
+uuid > $homedir/faythe-enrol
+chown -R $user $homedir
+chmod 750 $homedir
+chmod 600 $homedir/*
+
+gpasswd -a $user faythe-enrol
+
+echo -n "Enrolment token for $user is "
+cat $homedir/faythe-enrol

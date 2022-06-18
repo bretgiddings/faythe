@@ -1,0 +1,35 @@
+#!/bin/bash
+
+# this script receives the authenticating user as $1
+# and the Key ID as $2.
+# The Key ID is set in the CA signed key and takes the
+# form of <username>@<connecting-ip>
+# so we can validate those here
+
+echo $(date) $1 $2 > /tmp/ap
+
+# split $2 into user and ip
+IFS='@' read KEY_USER KEY_IP <<< $2
+
+if [[ $1 != $KEY_USER ]]; then
+	# failed user check
+	logger "Denied ssh key id $2 for user $1: user mismatch - expected $1"
+	exit
+fi
+
+MyPid=$$
+PPid=$( grep -w PPid /proc/$MyPid/status | awk '{print $2}' )
+X=$( lsof -n -P -i4 -itcp | grep $PPid | grep -o ":22->$KEY_IP:" )
+
+echo $X $KEY_USER $KEY_IP >> /tmp/ap
+
+if [[ -z $X ]]; then
+	# failed IP check
+	logger "Denied ssh key id $2 for user $1: ip mismatch - check user is connecting from $KEY_IP"
+	echo $1
+	exit
+fi
+
+
+logger "Accepted ssh key id $2 for user $1"
+echo $1

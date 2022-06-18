@@ -1,0 +1,81 @@
+#!/bin/bash
+
+bindir=$(dirname "$0")  # not perfect, but good enough
+homedir="${bindir}/../users/${USER}"
+domain="CHANGEME"       # set to site domain
+
+if [ ! -d "${homedir}" ]; then
+        echo "Can't find your home directory on CA server - can continue"
+        exit 1
+fi
+
+cd $homedir
+
+# process enrolment token held in file faythe-enrol
+
+printf "\e[?2004l"
+if [ ! -r faythe-enrol ]; then
+        echo "Your account isn't in setup mode - can't continue (no enrolment token)."
+        exit 1
+fi
+
+if [ $(date +%s -r faythe-enrol) -lt $(date +%s --date="60 min ago") ]; then
+       echo "Enrolment token was issued more than 1 hour ago."
+       exit 1
+fi
+
+assigned_guid=$(cat faythe-enrol)
+
+if [ -z "$assigned_guid" ]; then
+        echo "Your account isn't in setup mode - can't continue (invalid enrolment token)."
+        exit 1
+fi
+
+read -p "Enter enrolment token: " token
+
+if [[ -n $token && "$token" != "$assigned_guid" ]]; then
+        echo "Enrolment token incorrect."
+        exit 1
+fi
+
+read -p "Enter SSH public key: " pubkey
+
+if [[ -n $pubkey && $pubkey =~ ^[[:space:]]*ssh-(ed25519|ecdsa|rsa).*$ ]]; then
+        keyalgo=${BASH_REMATCH[1]}
+        keyinfo=$(echo $pubkey | ssh-keygen -l -f - 2>/dev/null)
+        if [[ -z $keyinfo ]]; then
+                echo "SSH public key not valid."
+                exit 1
+        fi
+
+        [[ $keyinfo =~ ^([[:digit:]])+[[:space:]] ]]
+        keybits=${BASH_REMATCH[1]}
+        if [[ $keyalgo == "rsa" && $keybits -le 2048 ]]; then
+                echo "RSA keys should be 2048 bits or longer - yours was $keybits!"
+                exit 1
+        fi
+else
+        echo "SSH public key not valid."
+        exit 1
+fi
+
+# remove enrolment token
+rm faythe-enrol
+
+# assign google authenticator
+key_preamble='command="${bindir}/reissue",restrict'
+
+/usr/bin/google-authenticator -t -d -l ${USER} -i sshca@$DOMAIN -Q none -s google-authenticator -f -w 3 -r 3 -R 30 -q -e 0
+read gatoken < ./google-authenticator
+echo ""
+echo "Please use your authenticator app to add the following."
+echo "If using Microsoft Authenticator, when adding, use type 'Other (Google, Facebook, etc)."
+echo ""
+qrencode -m 2 -t utf8  "otpauth://totp/${USER}?secret=${gatoken}&issuer=sshca@$DOMAIN"
+echo ""
+
+echo "${pubkey}" > "${USER}.pub"
+
+/usr/bin/sudo -n -- /usr/bin/gpasswd -d $USER faythe-enrol > /dev/null 2>&1
+
+exit 0

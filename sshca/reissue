@@ -1,0 +1,43 @@
+#!/bin/bash
+
+bindir=$(dirname "$0")  # not perfect, but good enough
+prefix="$bindir/.."
+ak="${USER}.pub"
+cert="${USER}-cert.pub"
+ca="$prefix/ca/ca"
+# source group principals if it exists
+[ -f "$prefix/etc/group_principals" ] && . "$prefix/etc/group_principals"
+
+cd "${prefix}/users/${USER}"
+
+if [ ! -f "${ak}" ]; then
+        echo "No authorized_keys file for user ${USER} - ${ak}."
+        exit 1
+fi
+
+serial=0;
+
+if [ -f "$cert" ]; then
+        serial=$( /usr/bin/ssh-keygen -Lf $cert | sed -E -n 's/^([[:space:]]+Serial: )([[:digit:]]+)([[:space:]]*)$/\2/p' )
+        serial=$(( serial + 1 ))
+fi
+
+# build a list of principals
+principal=$USER
+for P in "${group_principalS[@]}"; do
+        if id $USER 2>/dev/null | grep -q "($P)"; then
+                principal="${principal},${P}"
+        fi
+done
+
+umask 022
+
+# construct the Key ID
+read ip rest <<<$SSH_CONNECTION
+key_id="${USER}@${ip}"
+
+# set for tomorrow, 000000
+endtime="-1m:$(date -d '+1 day' +%Y%m%d)"
+/usr/bin/sudo /usr/bin/ssh-keygen -s "${ca}" -I "${key_id}" -n "$principal" -V "$endtime" -z "$serial" "${ak}"
+/usr/bin/logger --id=$$ --priority auth.info "Issued certificate for ${USER} with principals ${principal}"
+cat "${cert}"
