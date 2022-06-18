@@ -91,7 +91,7 @@ Finally, an example of scp - this too would prompt for password and 2fa if it wa
 
 ![SCP with trusted key](images/scp.png)
 
-## Enrolling a new user
+# Enrolling a new user
 
 Assuming that you have sent an enrolment token to a user, they can self-enrol their public key by ssh'ing to sshenrol.example.org:
 
