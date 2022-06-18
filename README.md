@@ -15,7 +15,7 @@ Note that this only works with OpenSSH command line clients and servers - so use
 
 ## Background
 
-If you use SSH a lot in your work, you are likely to prefer public keys over passwords, probably used in conjunction with an SSH agent. However, for the server administrator, enabling just public keys for authentication can be problematic as you have to trust that your users are using a secure passphrase against their public key. Using signed SSH public keys can partially solve this issue - you can prompt once per-day (or other suitable interval) and return a signed copy of their SSH public valid for that interval. If the signing process involves 2fa, you can further enhance your security as you now have a greater degree of trust in the initial authenticating and signing and the concerns about how well protected the users' private key are a partially addressed.
+If you use SSH a lot in your work, you are likely to prefer public keys over passwords, probably used in conjunction with an SSH agent. However, for the server administrator, enabling just public keys for authentication can be problematic as you have to trust that your users are using a secure passphrase against their public key. Using signed SSH public keys can partially solve this issue - you can prompt once per-day (or other suitable interval) and return a signed copy of their SSH public valid for that interval - with the ability to encode additional principals in the certificate for delegated access. If the signing process involves 2fa, you can further enhance your security as you now have a greater degree of trust in the initial authenticating and signing and the concerns about how well protected the users' private key are a partially addressed.
 
 # SSH CA Server
 
@@ -23,11 +23,10 @@ The SSH CA server needs the following (assuming debian or Ubuntu)
 
 * Additional packages (libpam-google-authenticator, sudo, bsdutils, uuid, qrencode)
 * Modifications to /etc/pam.d/ssh to enable google-authenticator and management of enrolment
-* Modifications fo /etc/ssh/sshd_config to match two groups (here called faythe-enrol and faythe-users) and enabling of ChallengeResponse.
-* Installation of a systemd service utilising inotify as a helper for completing enrolment of new users
+* Modifications fo /etc/ssh/sshd_config to match two groups (here called faythe-enrol and faythe-users) and enabling of ChallengeResponseAuthentication.
 * An optional file to match group membership to principals
-* Modification of /etc/sudoers to allow running ssh-keygen
-* Two scripts - one for enroling (faythe-enrol) and one for re-issuing (reissue)
+* Modification of /etc/sudoers to allow running ssh-keygen and management of _fayth_enrol_ group.
+* Two scripts - one for enroling (_enrol_) and one for re-issuing (_reissue_)
 
 # SSH Clients
 
@@ -37,11 +36,12 @@ The ssh clients need to modify the following files
   One entry for the ssh gateway, ca and enrolment servers  
   One entry for the site/domain where you want to authenticate using the CA signed keys
 * .bashrc or .zshrc (linux/mac)  
-  Add line to source ~/.ssh/.faythe.sh
-* $PROFILE (Windows Powershell) plus optional aliasing of ssh and scp
-  Add line to source ~/.ssh/.faythe.ps1 plus optional aliasing of ssh and scp.
-
-They will also need the appropriate .faythe script for their platform and a _domains_ file that contains settings used by the script and an _ed25519_ public key (_rsa_ also supported).
+  Add line to source ~/.config/faythe/faythe.sh
+  Recommended aliasing of ssh and scp
+* $PROFILE (Windows Powershell)
+  Add line to source $env:APPDATA/faythe/faythe.ps1
+  Recommended aliasing of ssh and scp
+* A _domains_ file to list one or more domains where _faythe_ is used
 
 Once installed correctly, clients can just use ssh or scp a per-usual from the command line and if the signed key needs to be renewed, they will be prompted.
 
@@ -49,13 +49,13 @@ Once installed correctly, clients can just use ssh or scp a per-usual from the c
 
 The config file _domains_ is used to determine when to use _faythe_ and when to just call standard _ssh/scp_ programs. An example _domains_ file is
 ```
-example.org alice ~/.ssh/id_ed25519
+example.org alice ~/.ssh/id_ed25519_example.org
 ```
 
 Each line contains (space or tab separated)
 1. A domain name - _faythe_ will only intercept if the _ssh_ or _scp_ command references a host in this domain. Also, _faythe_ expects that this domain has hosts _sshca.example.org_ for trusted key renewals, _sshenrol.example.org_ for enrolling of new users and _sshgw.example.org_ for the optional gateway.
 2. The login name to use at _example.org_
-3. The public key to use at _example.org_
+3. The public key to use at _example.org_ - it is recommended to use _ed25519 certificates and use the naming convention of _id_ed25519_example.org_
 
 Comments can be included and start with a _#_ and extend to the end of the line. Multiple domains are supported.
 
@@ -75,7 +75,7 @@ Then a subsquent connection to the same or different host in the same domain:
 
 ![Subsequent login](images/login2.png)
 
-And here, on _sshhost1.example.org_, alice has added
+In this example, on _sshhost1.example.org_, alice has added the following to her _.ssh/authorized_keys_ file
 
 ```
 cert-authority,principals="alice" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAvoR1MaEiuA/JAkInq+NK1ReeCVBAJFxCN8N3fTZ5An faythe-user-ca@example.org
@@ -85,7 +85,7 @@ and this host allows authentication by public keys - so the password is not requ
 
 ![Passwordless login](images/login3.png)
 
-Though it would be better for the site to only allow access through the sshgw which can be configured to only accept signed keys.
+However, it would be better for the site to only allow access through an sshgw which can be configured to only accept signed keys with restrictions on what hosts that user/key can access.
 
 Finally, an example of scp - this too would prompt for password and 2fa if it was the first connection of the day ...
 
