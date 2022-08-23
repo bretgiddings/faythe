@@ -12,14 +12,23 @@ param (
     [String]$TrustedHostCA = $null
 )
 
-if ( -not ( $env:Path | select-string "openssh" ) -and ( [System.Environment]::GetEnvironmentVariable("Path", "Machine") ) ) {
+if ( -not ( [System.Environment]::OSVersion.Platform -eq "Win32NT" ) ) {
     Write-Host @"
-Whilst SSH appears to be installed, it isn't yet in your path - please logout, then login and try again.
+This script is only intended for running on Windows platform.
 "@
     return
 }
 
-if ( -not ( Get-Command -Name ssh -Type Application -ErrorAction SilentlyContinue ) ) {
+$sshDir = $null
+
+foreach ( $dir in $env:PATH -split [System.IO.Path]::PathSeparator ) {
+    if ( ( Test-Path "$_/ssh.exe" ) -and ( Test-Path "$_/ssh-keygen.exe" ) ) {
+        $sshDir = $dir;
+        break
+    }
+}
+
+if ( $null -eq $sshDir ) {
     Write-Host @"
 You don't have OpenSSH installed (or in the PATH). Please open an administrative Powershell window and run
 
@@ -70,7 +79,7 @@ else {
     Write-Verbose "$HOME/.ssh folder present."
 }
 
-if ( -not ( Test-Path ~/.ssh/id_ed25519 ) ) {
+if ( -not ( Test-Path ~/.ssh/id_ed25519_$Domain ) ) {
     Write-Host @"
 Please run:
 
@@ -85,7 +94,7 @@ else {
 }
 
 # check key has a passphrase
-ssh-keygen -p -f $HOME/.ssh/id_ed25519_$Domain -N '""' -P '""' 2>&1 | Out-Null
+& $sshDir/ssh-keygen.exe -p -f $HOME/.ssh/id_ed25519_$Domain -N '""' -P '""' 2>&1 | Out-Null
 if ( $? -eq $true ) {
     Write-Host @"
 Your ssh key doesn't have a passphrase - for security please add one using
@@ -100,9 +109,9 @@ else {
     Write-Verbose "id_ed25519_$Domain has some sort of passphrase."
 }
 
-$fingerprint = $( ssh-keygen -l -f $HOME/.ssh/id_ed25519_$Domain )
+$fingerprint = $( & $sshDir/ssh-keygen.exe -l -f $HOME/.ssh/id_ed25519_$Domain )
 
-if ( -not ( ssh-add -l | Select-String -SimpleMatch "$fingerprint" ) ) {
+if ( -not ( & $sshDir/ssh-add.exe -l | Select-String -SimpleMatch "$fingerprint" ) ) {
     Write-Host @"
 Please run
 
@@ -163,7 +172,7 @@ $Domain $Login ~/.ssh/id_ed25519_$Domain
 "@ | Out-File -FilePath $env:APPDATA/faythe/domains -Encoding ascii
 }
 
-Write-Host "Creating/updating $env:APPDATA/faythe/faythe.ps1"
+Write-Host "Creating/updating $faythePS1"
 
 if ( -not ( Test-Path $faythePS1 -PathType Leaf ) ) {
     Write-Host "${faythePS1}: file not found."
@@ -221,6 +230,5 @@ $TrustedHostCA
     }
 }
 
-Write-Host "Update complete."
+Write-Host "Setup completed OK."
 
-& cmd /c pause
