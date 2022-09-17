@@ -17,7 +17,7 @@ _faythe_signkey() {
 	found=""
 	while read domain login idfile;
 	do
-		if printf "$*" | egrep -q "\.${domain}([[:space:]]|:|\$)"; then
+		if printf -- "$*" | egrep -q "\.${domain}([[:space:]]|:|\$)"; then
 			found=$domain
 			break
 		fi
@@ -36,9 +36,13 @@ _faythe_signkey() {
 	cert="${idfile}-cert.pub"
 
 	# if connecting to sshenrol.${domain}, just let ssh do its thing
-	if printf "$*" | egrep -q "@?sshenrol\.${domain}([[:space:]]|$)"; then
+	if printf -- "$*" | egrep -q "@?sshenrol\.${domain}([[:space:]]|$)"; then
 		return 0
 	fi
+
+	# explicit renewal - remove if defined
+
+	[ -n "${FAYTHE_RENEW:-}" ] && rm -f $cert
 
 	if [ -f "$cert" ]; then
 		valid=$( /usr/bin/ssh-keygen -Lf "$cert" | grep Valid: | sed -E 's/^(.* to )(.*)/\2/' )
@@ -49,14 +53,14 @@ _faythe_signkey() {
 		fi
 		now=$( date +'%s' )
 		if [ "$now" -lt "$until" ]; then
-			printf "+faythe: Current signed certificate valid until ${valid}\\n" >&2
+			[ -n "${FAYTHE_VERBOSE:-}" ] && printf "+faythe: Current signed certificate valid until ${valid}\\n" >&2
 			return 0
 		else
-			printf "+faythe: Signed certificate expired ${valid}\\n" >&2
+			[ -n "${FAYTHE_VERBOSE:-}" ] && printf "+faythe: Signed certificate expired ${valid}\\n" >&2
 		fi
 	fi
 
-	printf '+faythe: Requesting signed certificate ...\n' >&2
+	[ -n "${FAYTHE_VERBOSE:-}" ] && printf '+faythe: Requesting signed certificate ...\n' >&2
 	output=$( /usr/bin/ssh -T "${login}@sshca.${domain}" 2>/dev/null )
 
 	if [ -z "$output" ]; then
@@ -65,18 +69,22 @@ _faythe_signkey() {
 
 	key=$( printf "$output" | sed -E -n '/^ssh-(rsa|ed25519|ecdsa)-cert-v[[:digit:]]+@openssh.com AAA/p' )
 
-
 	if [ ! -z "$key" ]; then
 		printf "%s" "$key" > "$cert"
 		valid=$( /usr/bin/ssh-keygen -Lf "$cert" | grep Valid: | sed -E 's/^(.* to )(.*)/\2/' )
-		printf "+faythe: Wrote new key to %s file - valid until %s\\n" "$cert" "$valid" >&2
+		[ -n "${FAYTHE_VERBOSE:-}" ] && printf "+faythe: Wrote new key to %s file - valid until %s\\n" "$cert" "$valid" >&2
+		return 0
 	else
-		printf '+faythe: Failed to update cert signed key.\n' >&2
+		printf '*** +faythe: Failed to update cert signed key.\n' >&2
 		printf "$output"
 		return 1
 	fi
 
 	return 0
+}
+
+faythe_renew() {
+	FAYTHE_RENEW=1 _faythe_signkey $*
 }
 
 fssh() {
