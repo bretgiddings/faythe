@@ -9,7 +9,9 @@ param (
     [Parameter(Mandatory = $false)]
     [String]$FaythePS1 = "./faythe.ps1",
     [Parameter(Mandatory = $false)]
-    [String]$TrustedHostCA = $null
+    [String]$TrustedHostCA = $null,
+    [Parameter(Mandatory = $false)]
+    [String]$NoProxy = $null
 )
 
 if ( -not ( [System.Environment]::OSVersion.Platform -eq "Win32NT" ) ) {
@@ -22,7 +24,7 @@ This script is only intended for running on Windows platform.
 $sshDir = $null
 
 foreach ( $dir in $env:PATH -split [System.IO.Path]::PathSeparator ) {
-    if ( ( Test-Path "$_/ssh.exe" ) -and ( Test-Path "$_/ssh-keygen.exe" ) ) {
+    if ( ( Test-Path "$dir/ssh.exe" ) -and ( Test-Path "$dir/ssh-keygen.exe" ) ) {
         $sshDir = $dir;
         break
     }
@@ -71,15 +73,15 @@ else {
     Write-Verbose "ssh-agent running."
 }
 
-if ( -not ( Test-Path ~/.ssh -PathType Container ) ) {
-    Write-Host "Creating ~/.ssh folder."
-    New-Item -Path ~/.ssh -ItemType Container
+if ( -not ( Test-Path $HOME/.ssh -PathType Container ) ) {
+    Write-Host "Creating $HOME/.ssh folder."
+    New-Item -Path $HOME/.ssh -ItemType Container
 }
 else {
     Write-Verbose "$HOME/.ssh folder present."
 }
 
-if ( -not ( Test-Path ~/.ssh/id_ed25519_$Domain ) ) {
+if ( -not ( Test-Path $HOME/.ssh/id_ed25519_$Domain ) ) {
     Write-Host @"
 Please run:
 
@@ -189,10 +191,8 @@ Write-Host "Checking SSH config ..."
 $sshConfigFile = @"
 # ssh basic config file for remote access
 
-# bypass the proxy for these two
-Host sshca.$Domain sshgw.$Domain sshenrol.$Domain
-    User $login
-    IdentityFile ~/.ssh/id_ed25519_$Domain
+# bypass the proxy for these
+Host sshca.$Domain sshgw.$Domain sshenrol.$Domain $NoProxy
     ProxyJump none
 
 # anything else @ $Domain, use standard settings
@@ -214,19 +214,19 @@ if ( -not ( Test-Path -Path "${HOME}/.ssh/config" ) ) {
 }
 else {
     Write-Host @"
-Modify your ~/.ssh/config - it needs sections that look like:-
+Modify your $HOME/.ssh/config - it needs sections that look like:-
 
 $sshConfigFile
 "@
 }
 
 if ( $null -ne $TrustedHostCA ) {
-    if ( -not ( Test-Path -Path ~/.ssh/known_hosts ) -or -not ( Select-String -Path ~/.ssh/known_hosts "$TrustedHostCA" -SimpleMatch ) ) {
+    if ( -not ( Test-Path -Path $HOME/.ssh/known_hosts ) -or -not ( Select-String -Path $HOME/.ssh/known_hosts "$TrustedHostCA" -SimpleMatch ) ) {
         Write-Host "Added domain trusted host CA to ${HOME}/.ssh/known_hosts"
         @"
 # trusted SSH CA for $Domain
 $TrustedHostCA
-"@ | Out-File -FilePath ~/.ssh/known_hosts -Append -Encoding ascii
+"@ | Out-File -FilePath $HOME/.ssh/known_hosts -Append -Encoding ascii
     }
 }
 
