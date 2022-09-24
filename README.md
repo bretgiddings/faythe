@@ -11,7 +11,9 @@ _faythe_[^1] consists of three parts:
 
 _faythe_ is a set of client and server scripts designed to make using signed SSH keys transparent and straight-forward for the end users. At the client end, it provides (optional) posix shell or powershell functions to override _ssh_ and _scp_ which check whether the signed key is still current and will prompt for a new 2fa signed key if the current key is expired. At the server end, it provides for signing keys with a limited lifetime using the users' password and google-authenticator for 2fa. Additionally, new users can be enrolled via an enrolment token to facilitate uploading their private key. Finally, a separate SSH gateway can be configured to only trust SSH signed keys.
 
-Note that this only works with OpenSSH command line clients and servers - so use of PuTTY, winscp etc isn't catered for. Now that Microsoft provide a native OpenSSH client, this works on that platform too without having to resort to WSL - though it works fine with WSL too.
+Note that this only works with OpenSSH command line clients and servers - so use of PuTTY, winscp etc isn't directly catered for. Now that Microsoft provide a native OpenSSH client, this works on that platform too without having to resort to WSL - though it works fine with WSL too.
+
+Note however that PuTTY does support OpenSSH CA signed keys (from version 078 beta), if you convert your OpenSSH private key to PuTTY format and configure PuTTY to use your signed key too, so long as your key is signed, it'll work fine. The powershell version of _faythe_ includes the _Restore-Faythe_ command and the shell version _restore\_fayth_ - both of which will just grab a new signed key that will then work transparently with suitably configure PuTTY connections.
 
 ## Background
 
@@ -90,6 +92,26 @@ However, it would be better for the site to only allow access through an sshgw w
 Finally, an example of scp - this too would prompt for password and 2fa if it was the first connection of the day ...
 
 ![SCP with trusted key](images/scp.png)
+
+Note that sftp will also work in the same manner.
+
+## Explicitly updating your signed key
+
+If you are using something like PuTTY (version 0.78beta or newer) that supports CA signed keys then you need retrieve a new signed key if the existing one has expired. For this, you can use a shortcut function 
+
+### Powershell
+
+```
+Restore-Faythe <login>@sshca.<domain>
+```
+
+### Bash/Zsh etc
+
+```
+restore_faythe <login>@sshca.<domain>
+```
+
+Either will prompt for the usual 2fa to update the signed key.
 
 # Enrolling a new user
 
