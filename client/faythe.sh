@@ -83,7 +83,7 @@ _faythe_signkey() {
 	return 0
 }
 
-faythe_renew() {
+restore_faythe() {
 	FAYTHE_RENEW=1 _faythe_signkey $*
 }
 
