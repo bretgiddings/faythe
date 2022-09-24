@@ -141,6 +141,10 @@ if ( ( Test-Path -Path $PROFILE -PathType Leaf ) ) {
     if ( -not ( Select-String -Path $PROFILE -Pattern "(?i)Set-Alias -Name scp -Value fscp") ) {
         "Set-Alias -Name scp -Value fscp" | Out-File -Append $PROFILE
     }
+
+    if ( -not ( Select-String -Path $PROFILE -Pattern "(?i)Set-Alias -Name sftp -Value fsftp") ) {
+        "Set-Alias -Name sftp -Value fsftp" | Out-File -Append $PROFILE
+    }
 }
 else {
     Write-Host "Creating $PROFILE"
@@ -156,6 +160,7 @@ else {
 . $env:APPDATA/faythe/faythe.ps1
 Set-Alias -Name ssh -Value fssh
 Set-Alias -Name scp -Value fscp
+Set-Alias -Name sftp -value fstfp
 '@ | Out-File -FilePath $PROFILE -Encoding ascii 
 }
 
