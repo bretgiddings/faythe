@@ -7,7 +7,9 @@ function _faythe {
         [String]$cmd
     )
 
-    $cmdPath = ( Get-Command -Name "$cmd" -Type Application -ErrorAction SilentlyContinue )[0].Path
+    if ( $cmd -ne "renew" ) {
+        $cmdPath = ( Get-Command -Name "$cmd" -Type Application -ErrorAction SilentlyContinue )[0].Path
+    }
 
     # belt and braces for when we actually need to run ssh
     $sshPath = ( Get-Command -Name "ssh" -Type Application -ErrorAction SilentlyContinue )[0].Path
@@ -49,6 +51,11 @@ function _faythe {
 
     Set-Variable -Name renew -Value $true
 
+    if ( $cmd -eq "renew" ) {
+        # hallelujah
+        Remove-Item -Path "$cert" -Force 2>$null
+    }
+
     if ( Test-Path -Path "$cert" -PathType Leaf ) {
         $valid = $( & ssh-keygen -Lf $cert | select-string 'Valid:' ) -replace '^(.* to )(.*)', '$2'
         $until = [int64]( get-date -uformat %s $valid )
@@ -81,7 +88,9 @@ function _faythe {
     }
 
     # run the command
-    & $cmdPath $args
+    if ( $cmd -ne "renew" ) {
+        & $cmdPath $args
+    }
 
 }
 
@@ -93,6 +102,10 @@ function fscp {
     _faythe -cmd "scp"
 }
 
-# optional but recommended - override ssh and scp
-Set-Alias -Name ssh -Value fssh
-Set-Alias -Name scp -Value fscp
+function fsftp {
+    _faythe -cmd "sftp"
+}
+
+function Restore-Faythe {
+    _faythe -cmd "renew"
+}
