@@ -48,6 +48,8 @@ _faythe_signkey() {
 		valid=$( /usr/bin/ssh-keygen -Lf "$cert" | grep Valid: | sed -E 's/^(.* to )(.*)/\2/' )
 		if [ $( uname ) = "Darwin" ]; then	# mac
 			until=$( date -j -f '%FT%T' "$valid" +'%s' )
+		elif [ -h /bin/date -a $( readlink /bin/date | grep -o busybox ) = "busybox" ]; then
+			until=$( date -d "$( echo $valid | sed 's/T/ /' )" +'%s' )
 		else
 			until=$( date -d "$valid" +'%s' )
 		fi
