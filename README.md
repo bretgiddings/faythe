@@ -35,17 +35,35 @@ The SSH CA server needs the following (assuming debian or Ubuntu)
 The ssh clients need to modify the following files
 
 * ~/.ssh/config  
-  One entry for the ssh gateway, ca and enrolment servers  
-  One entry for the site/domain where you want to authenticate using the CA signed keys
+  One entry for the ssh gateway, ca and enrolment servers to avoid the gateway servers and one entry for the site/domain where you want to authenticate using the CA signed keys - this can either be of the form
+  ```
+  Host sshca.example.org sshgw.example.org sshenrol.example.org
+    ProxyJump none
+  
+  *.example.org
+    User alice
+    IdentityFile ~/.ssh/id_ed25519_example.org
+    ProxyJump alice@sshgw.example.org
+  ```
+  or
+  ```
+  Match Host !sshca.example.org,!sshgw.example.org,!sshenrol.example.org,*.example.org !exec "ssh-keyscan -T 1 %h >~/.ssh/junk 2>&1"
+    ProxyJump alice@sshgw.example.org
+  
+  *.example.org
+    User alice
+    IdentityFile ~/.ssh/id_ed25519_example.org
+  ```
+  The latter has the benefit of working both onsite and offsite and only using the gateway when absolutely required.
 * .bashrc or .zshrc (linux/mac)  
   Add line to source ~/.config/faythe/faythe.sh
   Recommended aliasing of ssh and scp
-* $PROFILE (Windows Powershell)
+* \$PROFILE (Windows Powershell)
   Add line to source $env:APPDATA/faythe/faythe.ps1
   Recommended aliasing of ssh and scp
 * A _domains_ file to list one or more domains where _faythe_ is used
 
-Once installed correctly, clients can just use ssh or scp a per-usual from the command line and if the signed key needs to be renewed, they will be prompted.
+Once installed correctly, clients can just use ssh, scp or sftp as per-usual from the command line and if the signed key needs to be renewed, they will be prompted.
 
 ### Format of _domains_ file
 
