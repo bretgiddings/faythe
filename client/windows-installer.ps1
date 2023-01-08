@@ -1,3 +1,4 @@
+#!/usr/bin/env pwsh
 # windows installer
 
 [CmdletBinding()]
@@ -202,36 +203,55 @@ else {
 
 Write-Host "+ Checking SSH config ..."
 
-$sshConfigFile = @"
-# ssh basic config file for remote access
-
-# bypass the proxy for these
-Host sshca.$Domain sshgw.$Domain sshenrol.$Domain $NoProxy
-    ProxyJump none
-
-# anything else @ $Domain, use standard settings
-Host *.$Domain
-    IdentityFile ~/.ssh/id_ed25519_$Domain
-    ForwardAgent yes
-    User $login
-    ProxyJump ${login}@sshgw.$Domain
-"@
-
 if ( -not ( Test-Path -Path "${HOME}/.ssh" -PathType Container ) ) {
     Write-Host "Creating ${HOME}/.ssh."
     New-Item -Path "${HOME}/.ssh" -ItemType Container | Out-Null
 }
 
-if ( -not ( Test-Path -Path "${HOME}/.ssh/config" ) ) {
+if ( -not ( Test-Path -Path "${HOME}/.ssh/config" -PathType Leaf ) ) {
     Write-Host "+ Creating ${HOME}/.ssh/config."
-    $sshConfigFile | Out-File -FilePath ${HOME}/.ssh/config -Encoding ascii
+    @"
+
+# generic config for ${Domain} - should come after any other more specialised rules
+
+Match Host *.{$Domain}
+    Include ~/.ssh/faythe_${Domain}.config
+
+"@ | Out-File -FilePath ${HOME}/.ssh/config -Encoding ascii
 }
 else {
-    Write-Host @"
-Modify your $HOME/.ssh/config - it needs sections that look like:-
+    if ( -not ( Select-String -Path "${HOME}/.ssh/config" -Pattern "(?i)^\s+Include ~/.ssh/faythe_${Domain}.config" ) ) {
+        Write-Host "+ Adding include statement to ${HOME}/.ssh/config"
+        @"
 
-$sshConfigFile
-"@
+# generic config for ${Domain} - should come after any other more specialised rules
+
+Match Host *.${Domain}
+    Include ~/.ssh/faythe_${Domain}.config
+
+"@ | Out-File -Append "${HOME}/.ssh/config" -Encoding ascii
+    }
+}
+
+if ( -not ( Test-Path -Path "${HOME}/.ssh/faythe_${Domain}.config" -PathType Leaf ) ) {
+    Write-Host "+ Creating include file ${HOME}/.ssh/faythe_${Domain}.config."
+    @"
+# faythe include file for domain ${Domain}
+
+# check if we need to route through the gateway 
+Match Host !sshgw.${Domain},!sshca.${Domain},!sshenrol.${Domain},*.${Domain} !exec "ssh-keyscan -T 1 %h >%d/.ssh/.junk 2>&1"
+    ProxyJump ${login}@sshgw.${Domain}
+    ForwardAgent no
+
+# otherwise, use the defaults - if you need to override these
+# do this in the main config before this include file is called
+
+Host *.${Domain}
+    User $login
+    IdentityFile ~/.ssh/id_ed25519_${Domain}
+    ForwardAgent yes
+
+"@ | Out-File -FilePath "${HOME}/.ssh/faythe_${Domain}.config" -Encoding ascii
 }
 
 if ( $null -ne $TrustedHostCA ) {

@@ -55,10 +55,12 @@ if [ ! -d ~/.ssh ]; then
     chmod 700 ~/.ssh
 fi
 
+enrol=0
 if [ ! -f ~/.ssh/id_ed25519_$domain ]; then
     echo "+ Running ssh-keygen - use a memorable passphrase and make a note of it."
 
     ssh-keygen -q -t ed25519 -f ~/.ssh/id_ed25519_$domain
+    enrol=1
 fi
 
 if ssh-keygen -p -f ~/.ssh/id_ed25519_$domain -N '' -P '' >/dev/null 2>&1; then
@@ -108,30 +110,34 @@ echo "+ Checking your ~/.ssh/config file ..."
 
 sshConfig="# ssh basic config file for remote access
 
-# bypass the proxy for these three
-Host sshca.$domain sshgw.$domain sshenrol.$domain $noproxy
-    User $login
-    ProxyJump none
+Match Host *.$domain
+    Include ~/.ssh/faythe_${domain}.config
+"
 
-Match Host !sshgw.$domain,!sshca.$domain,*.$domain !exec "ssh-keyscan -T 1 %h >~/.ssh/junk 2>&1"
+if [ ! -f ${HOME}/.ssh/config ]; then
+    echo "+ Creating ~/.ssh/config ..."
+    echo "$sshConfig" > ${HOME}/.ssh/config
+    chmod 0600 ~/.ssh/config
+else
+    if ! egrep -q "Include ~/.ssh/faythe_${domain}.config" ${HOME}/.ssh/config; then
+        echo "+ Adding include statement to ${HOME}/.ssh/config."
+        echo "$sshConfig" >> ${HOME}/.ssh/config
+    fi 
+fi
+
+echo "+ Updating faythe_${domain}.config."
+cat >${HOME}/.ssh/faythe_${domain}.config <<EOF_SSH_INCLUDE
+# faythe include file for $domain
+Match Host !sshgw.$domain,!sshca.$domain,*.$domain !exec "ssh-keyscan -T 1 %h >%d/.ssh/junk 2>&1"
     ProxyJump ${login}@sshgw.$domain
+    ForwardAgent no
 
 # anything else @ $domain, use standard settings
 Host *.$domain
     IdentityFile ~/.ssh/id_ed25519_$domain
     ForwardAgent yes
     User $login
-"
-if [ ! -f ~/.ssh/config ]; then
-    echo "+ Creating ~/.ssh/config ..."
-    echo "$sshConfig" > ~/.ssh/config
-    chmod 0600 ~/.ssh/config
-else
-    echo "+ Please modify your config to include ...
-
-$sshConfig
-"
-fi
+EOF_SSH_INCLUDE
 
 if [ -f ~/.ssh/known_hosts ]; then
     grep -q "$trustedHostCA" ~/.ssh/known_hosts
@@ -158,7 +164,7 @@ case "$unameOut" in
             chmod +x $HOME/.bash_profile
         fi
 
-        if egrep -q '^. $HOME/.config/faythe/faythe.sh' $HOME/.bash_profile; then
+        if egrep -q '^\. \${HOME}/.config/faythe/faythe.sh' $HOME/.bash_profile; then
             echo "+ Custom script already in .bash_profile"
         else
             echo "+ Adding '. \${HOME}/.config/faythe/faythe.sh' to $HOME/.bash_profile"
@@ -171,9 +177,7 @@ case "$unameOut" in
     *)          osEnv="UNKNOWN:${unameOut}"
 esac
 
-echo "+ Enrolling your SSH public key."
-/usr/bin/ssh ${login}@sshenrol.$domain "$(cat ${HOME}/.ssh/id_ed25519_${domain}.pub)"
-
-# 
-echo "+ Enabling new functions ..."
-exec $SHELL
+if [ "1" = "$enrol" ]; then
+    echo "+ Enrolling your SSH public key."
+    /usr/bin/ssh ${login}@sshenrol.$domain "$(cat ${HOME}/.ssh/id_ed25519_${domain}.pub)"
+fi
