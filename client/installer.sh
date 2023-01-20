@@ -119,7 +119,7 @@ if [ ! -f ${HOME}/.ssh/config ]; then
     echo "$sshConfig" > ${HOME}/.ssh/config
     chmod 0600 ~/.ssh/config
 else
-    if ! egrep -q "Include ~/.ssh/faythe_${domain}.config" ${HOME}/.ssh/config; then
+    if ! grep -E -q "Include ~/.ssh/faythe_${domain}.config" ${HOME}/.ssh/config; then
         echo "+ Adding include statement to ${HOME}/.ssh/config."
         echo "$sshConfig" >> ${HOME}/.ssh/config
     fi 
@@ -164,7 +164,7 @@ case "$unameOut" in
             chmod +x $HOME/.bash_profile
         fi
 
-        if egrep -q '^\. \${HOME}/.config/faythe/faythe.sh' $HOME/.bash_profile; then
+        if grep -E -q '^\. \${HOME}/.config/faythe/faythe.sh' $HOME/.bash_profile; then
             echo "+ Custom script already in .bash_profile"
         else
             echo "+ Adding '. \${HOME}/.config/faythe/faythe.sh' to $HOME/.bash_profile"

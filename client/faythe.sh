@@ -17,7 +17,7 @@ _faythe_signkey() {
 	found=""
 	while read domain login idfile;
 	do
-		if printf -- "$*" | egrep -q "\.${domain}([[:space:]]|:|\$)"; then
+		if printf -- "$*" | grep -E -q "\.${domain}([[:space:]]|:|\$)"; then
 			found=$domain
 			break
 		fi
@@ -36,7 +36,7 @@ _faythe_signkey() {
 	cert="${idfile}-cert.pub"
 
 	# if connecting to sshenrol.${domain}, just let ssh do its thing
-	if printf -- "$*" | egrep -q "@?sshenrol\.${domain}([[:space:]]|$)"; then
+	if printf -- "$*" | grep -E -q "@?sshenrol\.${domain}([[:space:]]|$)"; then
 		return 0
 	fi
 
