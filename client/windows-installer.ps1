@@ -170,7 +170,7 @@ else {
 . $env:APPDATA/faythe/faythe.ps1
 Set-Alias -Name ssh -Value fssh
 Set-Alias -Name scp -Value fscp
-Set-Alias -Name sftp -value fstfp
+Set-Alias -Name sftp -value fsftp
 '@ | Out-File -FilePath $PROFILE -Encoding ascii 
 }
 
@@ -214,7 +214,7 @@ if ( -not ( Test-Path -Path "${HOME}/.ssh/config" -PathType Leaf ) ) {
 
 # generic config for ${Domain} - should come after any other more specialised rules
 
-Match Host *.{$Domain}
+Match Host *.${Domain}
     Include ~/.ssh/faythe_${Domain}.config
 
 "@ | Out-File -FilePath ${HOME}/.ssh/config -Encoding ascii
